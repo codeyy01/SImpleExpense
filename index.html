@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Expense Tracker</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-SgOJa3DmI69IUzQ2PVdRZhwQ+dy64/BUtbMJw1MZ8t5HZApcHrRKUc4W0kG879m7" crossorigin="anonymous">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script> <!-- jsPDF Library -->
+  <style>
+    body {
+      font-family:  Helvetica 'Times New Roman', Times, serif, Arial, Helvetica, sans-serif;
+      width: 100%;
+      color:#fff
+    }
+    input, button, select {
+      padding: 8px;
+      margin: 5px 0;
+      width: 100%;
+      box-sizing: border-box;
+      border: 3px solid rgba(233, 195, 22, 0.479);
+    }
+    .expense {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px;
+      border-bottom: 1px solid #ddd;
+    }
+    .month-section {
+      border: 1px solid #aaa;
+      margin-top: 10px;
+      border-radius: 4px;
+      border-color: bisque;
+    }
+    .month-header {
+      background: #175419;
+      cursor: pointer;
+      padding: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background-color 0.3s;
+    }
+    .month-content {
+      display: none;
+      padding: 8px;
+      border-top: 1px solid burlywood;
+    }
+    .label-note {
+      font-size: 0.85em;
+      color: white;
+      margin-top: -7px;
+      margin-bottom: 10px;
+    }
+    button:hover {
+      background: rgb(73, 134, 74);
+      border-radius: 5px;
+    }
+    .delete-btn{
+      font-size: 1em;
+      width: 15%;
+      height: 3em;
+      background:#065534e9;
+      color: #fff;
+      border-radius: 0.2em;
+      border: 2px solid bisque;
+    }
+    .button1{
+      background: #065534e9;
+      border: 2px solid bisque;
+      border-radius: 0.2em; 
+      color: white; 
+      cursor: pointer;
+    }
+    .button1:hover{
+      background: rgb(73, 134, 74);
+      border-radius: 5px;
+      color: black;
+      font-weight: 600;
+    }
+
+    /* Header styling for search bar */
+    #header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px;
+      background: linear-gradient(to bottom, #006600 35%, #33cc33 100%);
+    }
+    #search-bar {
+      width: 250px;
+    }
+    .download-btn {
+      width: 10em;
+      background-color: #065534e9;
+      color: white;
+      padding: 10px 15px;
+      border: 2px solid bisque;
+      border-radius: 0.2em;
+      cursor: pointer;
+    }
+    .download-btn:hover {
+      background: rgb(73, 134, 74);
+      border-radius: 5px;
+      color: black;
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+  <header id="header">
+    <h1 class="text-white">Track expenses.</h1>
+    <!-- Add download PDF button here -->
+    <button class="download-btn" onclick="downloadPDF()">Download PDF</button>
+  </header>
+  
+  <div class="container-fluid col-12" style="background: linear-gradient(to top, #006600 50%, #33cc33 100%)">
+    <label class="mt-5" for="amount">Amount:</label>
+    <input type="number" id="amount" placeholder="Enter amount" />
+    <label class="mt-4" for="category">Category:</label>
+    <input list="category-options" id="category" placeholder="Select or type a category" />
+    <datalist id="category-options">
+      <option value="Food">
+      <option value="Travel">
+      <option value="Shopping">
+      <option value="Other">
+    </datalist>
+
+    <label class="mt-4" for="description">Description:</label>
+    <input type="text" id="description" placeholder="Optional but helpful" />
+    <div id="desc-note" class="label-note" style="display:none;">Adding a description helps you remember what the money was used for.</div>
+
+    <label class="mt-4" for="date">Date:</label>
+    <input type="date" id="date" />
+
+    <button id="addExpenseBtn" class="button1 mt-4" onclick="addExpense()">Add Expense</button>
+
+    <h4 class="mt-4">Total Days: <span id="totalDays">0</span></h4>
+    <h3 style="padding-bottom: 2em;" class="mt-1 ">Total Amount: ₹<span id="totalAmount">0</span></h3>
+    <input type="text" id="search-bar" placeholder="Search by category..." oninput="searchExpenses()" />
+
+    <div id="expenses"></div>
+  </div>
+
+  <script>
+    let expenses = JSON.parse(localStorage.getItem("expenses")) || [];
+    let firstDate = null;
+    let lastDate = null;
+    let descriptionSkippedOnce = false;
+
+    function getCurrentDateStr() {
+      const now = new Date();
+      return now.toISOString().split("T")[0];
+    }
+
+
+
+    function addExpense() {
+      const amount = parseFloat(document.getElementById("amount").value);
+      const category = document.getElementById("category").value.trim();
+      const description = document.getElementById("description").value.trim();
+      const date = document.getElementById("date").value;
+
+      if (isNaN(amount) || amount <= 0) {
+        alert("Enter a valid amount");
+        return;
+      }
+
+      if (!category || !isNaN(category)) {
+        alert("Please enter a valid category (not just numbers).");
+        return;
+      }
+
+      if (!description && !descriptionSkippedOnce) {
+        document.getElementById("desc-note").style.display = "block";
+        const btn = document.getElementById("addExpenseBtn");
+        btn.classList.remove("button-blue");
+        btn.classList.add("button-red");
+        descriptionSkippedOnce = true;
+        return;
+      }
+
+      expenses.push({ amount, category, description, date });
+
+      if (!firstDate) firstDate = date;
+      lastDate = date;
+
+      document.getElementById("amount").value = "";
+      document.getElementById("category").value = "";
+      document.getElementById("description").value = "";
+      document.getElementById("desc-note").style.display = "none";
+
+      const btn = document.getElementById("addExpenseBtn");
+      btn.classList.remove("button-red");
+      btn.classList.add("button-blue");
+
+      descriptionSkippedOnce = false;
+
+      // Save to local storage
+      localStorage.setItem("expenses", JSON.stringify(expenses));
+
+      renderExpenses();
+    }
+
+    function deleteExpense(index) {
+      expenses.splice(index, 1);
+      localStorage.setItem("expenses", JSON.stringify(expenses));
+      renderExpenses();
+    }
+
+    function calculateTotalDays() {
+      if (!firstDate || !lastDate) return 0;
+      const firstDateObj = new Date(firstDate);
+      const lastDateObj = new Date(lastDate);
+      const timeDiff = lastDateObj - firstDateObj;
+      return timeDiff / (1000 * 3600 * 24);
+    }
+
+    function renderExpenses() {
+      const grouped = {};
+      let total = 0;
+
+      expenses.forEach(e => {
+        const month = e.date.slice(0, 7);
+        if (!grouped[month]) grouped[month] = [];
+        grouped[month].push(e);
+        total += e.amount;
+      });
+
+      const container = document.getElementById("expenses");
+      container.innerHTML = "";
+
+      for (const month in grouped) {
+        const section = document.createElement("div");
+        section.className = "month-section";
+
+        const header = document.createElement("div");
+        header.className = "month-header";
+        header.dataset.month = month;
+        const monthName = new Date(month + "-01").toLocaleString("default", { month: "long", year: "numeric" });
+        header.innerHTML = `<span>${monthName}</span> <span>▼</span>`;
+        header.onclick = function () {
+          const content = section.querySelector(".month-content");
+          content.style.display = content.style.display === "block" ? "none" : "block";
+        };
+
+        const content = document.createElement("div");
+        content.className = "month-content";
+        content.style.display = "none";
+
+        grouped[month].forEach((e) => {
+          const div = document.createElement("div");
+          div.className = "expense";
+          div.innerHTML = `
+            <span>${e.category}</span>
+            <span>₹${e.amount}</span>
+            <span>${e.date}</span>
+            <button class="delete-btn" onclick="deleteExpense(${expenses.indexOf(e)})">Delete</button>
+          `;
+          content.appendChild(div);
+        });
+
+        section.appendChild(header);
+        section.appendChild(content);
+        container.appendChild(section);
+      }
+
+      document.getElementById("totalAmount").innerText = total;
+      document.getElementById("totalDays").innerText = calculateTotalDays();
+    }
+
+    function searchExpenses() {
+      const query = document.getElementById("search-bar").value.toLowerCase();
+      const filtered = expenses.filter(e => e.category.toLowerCase().includes(query));
+      renderFilteredExpenses(filtered);
+    }
+
+    function renderFilteredExpenses(filteredExpenses) {
+      const container = document.getElementById("expenses");
+      container.innerHTML = "";
+      const grouped = {};
+      let total = 0;
+
+      filteredExpenses.forEach(e => {
+        const month = e.date.slice(0, 7);
+        if (!grouped[month]) grouped[month] = [];
+        grouped[month].push(e);
+        total += e.amount;
+      });
+
+      for (const month in grouped) {
+        const section = document.createElement("div");
+        section.className = "month-section";
+
+        const header = document.createElement("div");
+        header.className = "month-header";
+        header.dataset.month = month;
+        const monthName = new Date(month + "-01").toLocaleString("default", { month: "long", year: "numeric" });
+        header.innerHTML = `<span>${monthName}</span> <span>▼</span>`;
+        header.onclick = function () {
+          const content = section.querySelector(".month-content");
+          content.style.display = content.style.display === "block" ? "none" : "block";
+        };
+
+        const content = document.createElement("div");
+        content.className = "month-content";
+        content.style.display = "none";
+
+        grouped[month].forEach((e) => {
+          const div = document.createElement("div");
+          div.className = "expense";
+          div.innerHTML = `
+            <span>${e.category}</span>
+            <span>₹${e.amount}</span>
+            <span>${e.date}</span>
+            <button class="delete-btn" onclick="deleteExpense(${expenses.indexOf(e)})">Delete</button>
+          `;
+          content.appendChild(div);
+        });
+
+        section.appendChild(header);
+        section.appendChild(content);
+        container.appendChild(section);
+      }
+
+      document.getElementById("totalAmount").innerText = total;
+      document.getElementById("totalDays").innerText = calculateTotalDays();
+    }
+
+    // PDF Download functionality
+    function downloadPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      let content = `Total Amount: ₹${document.getElementById("totalAmount").innerText}\n\n`;
+      content += `Total Days: ${document.getElementById("totalDays").innerText}\n\n`;
+
+      expenses.forEach((expense, index) => {
+        content += `Expense ${index + 1}:\n`;
+        content += `Amount: ₹${expense.amount}\n`;
+        content += `Category: ${expense.category}\n`;
+        content += `Description: ${expense.description}\n`;
+        content += `Date: ${expense.date}\n\n`;
+      });
+
+      doc.text(content, 10, 10);
+      doc.save('expenses.pdf');
+    }
+
+    renderExpenses();
+  </script>
+  
+</body>
+</html>
